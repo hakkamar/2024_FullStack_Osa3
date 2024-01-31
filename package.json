@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "build:ui": "@powershell Remove-Item -Recurse -Force dist && cd ../2024_FullStackOpen/2/puhelinluettelo/ && npm run build && @powershell Copy-Item dist -Recurse ../../../2024_FullStack_Osa3/",
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
