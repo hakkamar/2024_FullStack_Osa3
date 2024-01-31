@@ -1,0 +1,29 @@
+{
+  "name": "2024_fullstack_osa3",
+  "version": "1.0.0",
+  "description": "Puhelinluettelon Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hakkamar/2024_FullStack_Osa3.git"
+  },
+  "author": "Marko Hakkarainen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hakkamar/2024_FullStack_Osa3/issues"
+  },
+  "homepage": "https://github.com/hakkamar/2024_FullStack_Osa3#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
