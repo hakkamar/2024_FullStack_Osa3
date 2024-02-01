@@ -1,18 +1,29 @@
 const express = require("express");
 const app = express();
-const morgan = require("morgan");
 const cors = require("cors");
+require("dotenv").config();
+
+const Person = require("./models/person");
+
+const morgan = require("morgan");
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
+  }
+  next(error);
+};
 
 const unknownEndpoint = (request, response) => {
   response.status(404).send({ error: "unknown endpoint" });
 };
 
-app.use(express.json());
 app.use(cors());
-app.use(express.static("dist"));
-
+app.use(express.json());
 //app.use(morgan("tiny"));
-//app.use(morgan("dev"));
 app.use(
   morgan(function (tokens, req, res) {
     return [
@@ -27,29 +38,16 @@ app.use(
     ].join(" ");
   })
 );
+app.use(express.static("dist"));
 
-let persons = [
-  {
-    id: 1,
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: 2,
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: 3,
-    name: "Dan Abramov",
-    number: "12-43-234345",
-  },
-  {
-    id: 4,
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-  },
-];
+let kpl = 0;
+
+// Info-sivulle kappalemäärä...
+function kuiPalOllenkka() {
+  Person.find({}).then((persons) => {
+    kpl = persons.length;
+  });
+}
 
 // Juuren tervehdys...
 app.get("/", (request, response) => {
@@ -58,9 +56,10 @@ app.get("/", (request, response) => {
 
 // Info-sivun tervehdys...
 app.get("/info", (request, response) => {
+  kuiPalOllenkka();
   const infoTexti =
     "<p>Phonebook has info for " +
-    persons.length +
+    kpl +
     " people</p>" +
     "<p>" +
     Date() +
@@ -70,93 +69,76 @@ app.get("/info", (request, response) => {
 
 // Haetaan kaikki...
 app.get("/api/persons", (request, response) => {
-  console.log("Haettiin koko puhelinmuistio");
-  response.json(persons);
+  //console.log("Haetaan koko puhelinmuistio");
+  Person.find({}).then((persons) => {
+    response.json(persons);
+    kuiPalOllenkka();
+  });
 });
 
 // Haetaan henkilö ID:llä...
-app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  //const id = request.params.id;
-  console.log("Haetaan henkilö id:llä... ", id);
-  const person = persons.find((person) => person.id === id);
-
-  if (person) {
-    console.log("... henkilö on ", person);
-    response.json(person);
-  } else {
-    console.log("... No ei sitä löydy! ");
-    response.status(404).end();
-  }
+app.get("/api/persons/:id", (request, response, next) => {
+  Person.findById(request.params.id)
+    .then((person) => {
+      if (person) {
+        response.json(person);
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-// ID:n muodostus...
-function getRndInteger() {
-  let min = persons.length + 1;
-  let max = persons.length + 1000;
-
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-  //return String(Math.floor(Math.random() * (max - min + 1)) + min);
-}
-
-function pieniksi(merkit) {
-  return merkit.toLowerCase();
-}
-
 // Lisätään uusi henkilö...
-app.post("/api/persons", (request, response) => {
+app.post("/api/persons", (request, response, next) => {
   const body = request.body;
-  //console.log(request.headers);
-  console.log("Lisätään henkilö: ", body);
+  //console.log("Lisätään henkilö: ", body);
 
-  switch (true) {
-    case !body.name:
-      console.log("... no, ei lisätä! Ei oo nimee...  ");
-      return response.status(400).json({
-        error: "name missing",
-      });
-    case !body.number:
-      console.log("... no, ei lisätä! Ei oo numeroo...  ");
-      return response.status(400).json({
-        error: "number missing",
-      });
-  }
-
-  const muistionKaikkiNimet = persons.map((x) => pieniksi(x.name));
-  const onJoMuistiossa = muistionKaikkiNimet.includes(pieniksi(body.name));
-  console.log("onJoMuistiossa?", onJoMuistiossa);
-  if (onJoMuistiossa) {
-    console.log("... no, ei lisätä! On jo muistiossa...  ", body.name);
-    return response.status(400).json({
-      error: "name must be unique",
-    });
-  }
-
-  const persoona = {
-    id: getRndInteger(),
+  const person = new Person({
     name: body.name,
     number: body.number,
-  };
+  });
 
-  persons = persons.concat(persoona);
-  console.log("... no, lisättiin  ", persoona);
-  response.json(persoona);
+  person
+    .save()
+    .then((savedPerson) => {
+      response.json(savedPerson);
+      kuiPalOllenkka();
+    })
+    .catch((error) => next(error));
+});
+
+// Päivitetään henkilön tiedot
+app.put("/api/persons/:id", (request, response, next) => {
+  const { name, number } = request.body;
+  //console.log("Päivitetään henkilö: ", request.body);
+
+  Person.findByIdAndUpdate(
+    request.params.id,
+    { name, number },
+    { new: true, runValidators: true, context: "query" }
+  )
+    .then((updatedPerson) => {
+      response.json(updatedPerson);
+    })
+    .catch((error) => next(error));
 });
 
 // Poistetaan henkilö ID:llä...
-app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  //const id = request.params.id;
-  console.log("Poistetaan henkilö id:llä ", id);
-  persons = persons.filter((person) => person.id !== id);
-  console.log("... persoonat nyt", persons);
-
-  response.status(204).end();
+app.delete("/api/persons/:id", (request, response, next) => {
+  //console.log("Poistetaan henkilö id:llä ", request.params.id);
+  Person.findByIdAndDelete(request.params.id)
+    .then((result) => {
+      response.status(204).end();
+      kuiPalOllenkka();
+    })
+    .catch((error) => next(error));
 });
 
 app.use(unknownEndpoint);
+app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
